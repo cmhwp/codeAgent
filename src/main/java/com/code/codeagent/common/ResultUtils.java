@@ -56,8 +56,8 @@ public class ResultUtils {
      * @param errorCode 错误码枚举
      * @return 失败响应
      */
-    public static BaseResponse<Void> error(ErrorCode errorCode) {
-        return new BaseResponse<>(errorCode);
+    public static <T> BaseResponse<T> error(ErrorCode errorCode) {
+        return new BaseResponse<>(errorCode.getCode(), null, errorCode.getMessage());
     }
 
     /**
@@ -67,7 +67,7 @@ public class ResultUtils {
      * @param message 错误消息
      * @return 失败响应
      */
-    public static BaseResponse<Void> error(int code, String message) {
+    public static <T> BaseResponse<T> error(int code, String message) {
         return new BaseResponse<>(code, null, message);
     }
 
@@ -78,7 +78,7 @@ public class ResultUtils {
      * @param message   自定义错误消息
      * @return 失败响应
      */
-    public static BaseResponse<Void> error(ErrorCode errorCode, String message) {
+    public static <T> BaseResponse<T> error(ErrorCode errorCode, String message) {
         return new BaseResponse<>(errorCode.getCode(), null, message);
     }
 
@@ -87,7 +87,7 @@ public class ResultUtils {
      *
      * @return 系统错误响应
      */
-    public static BaseResponse<Void> systemError() {
+    public static <T> BaseResponse<T> systemError() {
         return error(ErrorCode.SYSTEM_ERROR);
     }
 
@@ -96,7 +96,7 @@ public class ResultUtils {
      *
      * @return 参数错误响应
      */
-    public static BaseResponse<Void> paramError() {
+    public static <T> BaseResponse<T> paramError() {
         return error(ErrorCode.PARAMS_ERROR);
     }
 
@@ -105,7 +105,7 @@ public class ResultUtils {
      *
      * @return 未登录错误响应
      */
-    public static BaseResponse<Void> notLoginError() {
+    public static <T> BaseResponse<T> notLoginError() {
         return error(ErrorCode.NOT_LOGIN_ERROR);
     }
 
@@ -114,7 +114,7 @@ public class ResultUtils {
      *
      * @return 无权限错误响应
      */
-    public static BaseResponse<Void> noAuthError() {
+    public static <T> BaseResponse<T> noAuthError() {
         return error(ErrorCode.NO_AUTH_ERROR);
     }
 
@@ -123,7 +123,7 @@ public class ResultUtils {
      *
      * @return 资源不存在错误响应
      */
-    public static BaseResponse<Void> notFoundError() {
+    public static <T> BaseResponse<T> notFoundError() {
         return error(ErrorCode.NOT_FOUND_ERROR);
     }
 } 
