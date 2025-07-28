@@ -23,8 +23,9 @@ public class SaTokenConfig implements WebMvcConfigurer {
         // 注册 Sa-Token 拦截器，校验规则为 StpUtil.checkLogin() 登录校验。
         registry.addInterceptor(new SaInterceptor(handle -> {
             SaRouter.match("/**")    // 拦截的 path 列表，可以写多个 */
-                    .notMatch("/auth/login")        // 排除掉的 path 列表，可以写多个
-                    .notMatch("/auth/register")     // 排除注册接口
+                    .notMatch("/user/login")        // 排除用户登录接口
+                    .notMatch("/user/register")     // 排除用户注册接口
+                    .notMatch("/auth/**")           // 排除认证状态查询接口
                     .notMatch("/example/**")        // 排除示例接口
                     .notMatch("/swagger-ui/**")     // 排除 Swagger UI
                     .notMatch("/swagger-ui.html")   // 排除 Swagger UI
@@ -33,7 +34,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                     .notMatch("/webjars/**")        // 排除静态资源
                     .notMatch("/favicon.ico")       // 排除图标
                     .notMatch("/error")             // 排除错误页面
-                    .check(r -> StpUtil.checkLogin());        // 登录校验 -- 拦截所有路由，并排除/user/doLogin 用于开放登录
+                    .check(r -> StpUtil.checkLogin());        // 登录校验 -- 拦截所有路由，并排除指定接口
         })).addPathPatterns("/**");
     }
 

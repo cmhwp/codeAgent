@@ -13,42 +13,14 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 认证控制器
+ * 认证状态控制器
+ * 提供Sa-Token相关的认证状态查询接口
  */
 @RestController
 @RequestMapping("/auth")
-@Tag(name = "认证管理", description = "用户认证相关接口")
+@Tag(name = "认证状态", description = "Sa-Token认证状态相关接口")
 @Slf4j
 public class AuthController {
-
-    /**
-     * 用户登录接口
-     */
-    @PostMapping("/login")
-    @Operation(summary = "用户登录", description = "用户登录认证")
-    public BaseResponse<Map<String, Object>> login(@RequestParam String username, @RequestParam String password) {
-        // 此处仅做演示，实际开发中应该验证用户名密码
-        if ("admin".equals(username) && "123456".equals(password)) {
-            // 第1步，先登录
-            StpUtil.login(username);
-            
-            // 第2步，获取 Token 相关信息
-            Map<String, Object> result = new HashMap<>();
-            result.put("token", StpUtil.getTokenValue());
-            result.put("loginId", StpUtil.getLoginId());
-            result.put("loginDevice", StpUtil.getLoginDevice());
-            result.put("tokenTimeout", StpUtil.getTokenTimeout());
-            result.put("sessionTimeout", StpUtil.getSessionTimeout());
-            result.put("tokenSessionTimeout", StpUtil.getTokenSessionTimeout());
-            result.put("tokenActiveTimeout", StpUtil.getTokenActiveTimeout());
-            result.put("loginType", StpUtil.getLoginType());
-            
-            log.info("用户 {} 登录成功", username);
-            return ResultUtils.success(result, "登录成功");
-        } else {
-            return ResultUtils.error(40001, "用户名或密码错误");
-        }
-    }
 
     /**
      * 查询登录状态
