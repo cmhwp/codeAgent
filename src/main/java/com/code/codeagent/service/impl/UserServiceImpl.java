@@ -6,8 +6,10 @@ import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.code.codeagent.constant.MailConstant;
+import com.code.codeagent.constant.PermissionConstant;
 import com.code.codeagent.constant.UserConstant;
 import com.code.codeagent.model.dto.UserUpdateMyRequest;
+import com.code.codeagent.model.enums.UserRoleEnum;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
 import com.code.codeagent.service.MailService;
@@ -20,6 +22,8 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -344,5 +348,89 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
         
         return result;
+    }
+
+    @Override
+    public boolean updateUserRole(Long userId, String newRole) {
+        // 1. 校验参数
+        if (userId == null || StrUtil.isBlank(newRole)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数不能为空");
+        }
+
+        // 2. 校验角色是否有效
+        UserRoleEnum roleEnum = UserRoleEnum.getEnumByValue(newRole);
+        if (roleEnum == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "无效的角色");
+        }
+
+        // 3. 校验用户是否存在
+        User user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户不存在");
+        }
+
+        // 4. 更新角色
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setUserRole(newRole);
+        
+        boolean result = this.updateById(updateUser);
+        if (result) {
+            log.info("用户 {} 角色更新成功：{} -> {}", userId, user.getUserRole(), newRole);
+        }
+        
+        return result;
+    }
+
+    @Override
+    public List<String> getUserRoles(Long userId) {
+        List<String> roles = new ArrayList<>();
+        User user = this.getById(userId);
+        if (user != null && user.getUserRole() != null) {
+            roles.add(user.getUserRole());
+        }
+        return roles;
+    }
+
+    @Override
+    public List<String> getUserPermissions(Long userId) {
+        List<String> permissions = new ArrayList<>();
+        User user = this.getById(userId);
+        
+        if (user != null && user.getUserRole() != null) {
+            String userRole = user.getUserRole();
+            
+            // 根据角色分配权限
+            switch (userRole) {
+                case UserConstant.ADMIN_ROLE:
+                    // 管理员拥有所有权限
+                    permissions.add(PermissionConstant.User.READ);
+                    permissions.add(PermissionConstant.User.WRITE);
+                    permissions.add(PermissionConstant.User.DELETE);
+                    permissions.add(PermissionConstant.User.ADMIN);
+                    permissions.add(PermissionConstant.System.MANAGE);
+                    permissions.add(PermissionConstant.Mail.SEND);
+                    permissions.add(PermissionConstant.Mail.MANAGE);
+                    break;
+                    
+                case UserConstant.DEFAULT_ROLE:
+                    // 普通用户权限
+                    permissions.add(PermissionConstant.User.READ);
+                    permissions.add(PermissionConstant.User.WRITE);
+                    permissions.add(PermissionConstant.Mail.SEND);
+                    break;
+                    
+                case UserConstant.BAN_ROLE:
+                    // 被封号用户没有权限
+                    break;
+                    
+                default:
+                    // 默认权限
+                    permissions.add(PermissionConstant.User.READ);
+                    break;
+            }
+        }
+        
+        return permissions;
     }
 }

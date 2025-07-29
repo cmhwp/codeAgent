@@ -3,6 +3,8 @@ package com.code.codeagent.service;
 import com.code.codeagent.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
 
+import java.util.List;
+
 /**
  * 用户服务接口
  *
@@ -114,4 +116,29 @@ public interface UserService extends IService<User> {
      * @return 是否成功
      */
     boolean resetPassword(String email, String code, String newPassword);
+
+    /**
+     * 更新用户角色（仅管理员）
+     *
+     * @param userId 用户ID
+     * @param newRole 新角色
+     * @return 是否成功
+     */
+    boolean updateUserRole(Long userId, String newRole);
+
+    /**
+     * 获取用户角色列表
+     *
+     * @param userId 用户ID
+     * @return 角色列表
+     */
+    List<String> getUserRoles(Long userId);
+
+    /**
+     * 获取用户权限列表
+     *
+     * @param userId 用户ID
+     * @return 权限列表
+     */
+    List<String> getUserPermissions(Long userId);
 }

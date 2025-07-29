@@ -3,6 +3,7 @@ package com.code.codeagent.controller;
 import com.code.codeagent.common.BaseResponse;
 import com.code.codeagent.common.ResultUtils;
 import com.code.codeagent.model.dto.*;
+import com.code.codeagent.constant.PermissionConstant;
 import com.code.codeagent.model.entity.User;
 import com.code.codeagent.model.vo.LoginUserVO;
 import com.code.codeagent.model.vo.UserVO;
@@ -17,7 +18,13 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckRole;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 用户接口
@@ -115,6 +122,7 @@ public class UserController {
      */
     @GetMapping("/get")
     @SaCheckLogin
+    @SaCheckRole("admin")
     @Operation(summary = "根据id获取用户", description = "根据id获取用户（仅管理员）")
     public BaseResponse<User> getUserById(long id) {
         User user = userService.getById(id);
@@ -218,10 +226,75 @@ public class UserController {
             return ResultUtils.error(40000, "两次输入的新密码不一致");
         }
 
-        boolean result = userService.resetPassword(
-                resetPasswordRequest.getEmail(),
-                resetPasswordRequest.getCode(),
-                resetPasswordRequest.getNewPassword());
-        return ResultUtils.success(result);
-    }
-}
+                 boolean result = userService.resetPassword(
+                 resetPasswordRequest.getEmail(),
+                 resetPasswordRequest.getCode(),
+                 resetPasswordRequest.getNewPassword());
+         return ResultUtils.success(result);
+     }
+
+     /**
+      * 更新用户角色（仅管理员）
+      *
+      * @param updateUserRoleRequest 更新用户角色请求
+      * @return 是否成功
+      */
+     @PostMapping("/update-role")
+     @SaCheckLogin
+     @SaCheckRole("admin")
+     @Operation(summary = "更新用户角色", description = "更新指定用户的角色（仅管理员）")
+     public BaseResponse<Boolean> updateUserRole(@Valid @RequestBody UpdateUserRoleRequest updateUserRoleRequest) {
+         boolean result = userService.updateUserRole(
+                 updateUserRoleRequest.getUserId(), 
+                 updateUserRoleRequest.getNewRole());
+         return ResultUtils.success(result);
+     }
+
+     /**
+      * 获取用户角色列表
+      *
+      * @param userId 用户ID
+      * @return 角色列表
+      */
+     @GetMapping("/roles/{userId}")
+     @SaCheckLogin
+     @SaCheckPermission(PermissionConstant.User.ADMIN)
+     @Operation(summary = "获取用户角色", description = "获取指定用户的角色列表")
+     public BaseResponse<List<String>> getUserRoles(@PathVariable Long userId) {
+         List<String> roles = userService.getUserRoles(userId);
+         return ResultUtils.success(roles);
+     }
+
+     /**
+      * 获取用户权限列表
+      *
+      * @param userId 用户ID
+      * @return 权限列表
+      */
+     @GetMapping("/permissions/{userId}")
+     @SaCheckLogin
+     @SaCheckPermission(PermissionConstant.User.ADMIN)
+     @Operation(summary = "获取用户权限", description = "获取指定用户的权限列表")
+     public BaseResponse<List<String>> getUserPermissions(@PathVariable Long userId) {
+         List<String> permissions = userService.getUserPermissions(userId);
+         return ResultUtils.success(permissions);
+     }
+
+     /**
+      * 获取当前用户的角色和权限
+      *
+      * @return 角色和权限信息
+      */
+     @GetMapping("/my-permissions")
+     @SaCheckLogin
+     @Operation(summary = "获取我的权限", description = "获取当前登录用户的角色和权限")
+     public BaseResponse<Map<String, Object>> getMyPermissions() {
+         User loginUser = userService.getLoginUser();
+         
+         Map<String, Object> result = new HashMap<>();
+         result.put("roles", userService.getUserRoles(loginUser.getId()));
+         result.put("permissions", userService.getUserPermissions(loginUser.getId()));
+         
+         return ResultUtils.success(result);
+     }
+ }

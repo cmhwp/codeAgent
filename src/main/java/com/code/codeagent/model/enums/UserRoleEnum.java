@@ -10,17 +10,20 @@ import lombok.Getter;
 @Getter
 public enum UserRoleEnum {
 
-    USER("user", "普通用户"),
-    ADMIN("admin", "管理员"),
-    BAN("ban", "被封号");
+    USER("user", "普通用户", "基础用户权限"),
+    ADMIN("admin", "管理员", "完整管理权限"),
+    BAN("ban", "被封号", "无任何权限");
 
     private final String value;
 
     private final String text;
 
-    UserRoleEnum(String value, String text) {
+    private final String description;
+
+    UserRoleEnum(String value, String text, String description) {
         this.value = value;
         this.text = text;
+        this.description = description;
     }
 
     /**
@@ -39,5 +42,35 @@ public enum UserRoleEnum {
             }
         }
         return null;
+    }
+
+    /**
+     * 检查是否为管理员角色
+     *
+     * @param role 角色值
+     * @return 是否为管理员
+     */
+    public static boolean isAdmin(String role) {
+        return ADMIN.getValue().equals(role);
+    }
+
+    /**
+     * 检查是否为普通用户角色
+     *
+     * @param role 角色值
+     * @return 是否为普通用户
+     */
+    public static boolean isUser(String role) {
+        return USER.getValue().equals(role);
+    }
+
+    /**
+     * 检查是否为被封号角色
+     *
+     * @param role 角色值
+     * @return 是否被封号
+     */
+    public static boolean isBan(String role) {
+        return BAN.getValue().equals(role);
     }
 } 
