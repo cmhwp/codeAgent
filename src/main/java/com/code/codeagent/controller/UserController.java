@@ -2,12 +2,11 @@ package com.code.codeagent.controller;
 
 import com.code.codeagent.common.BaseResponse;
 import com.code.codeagent.common.ResultUtils;
-import com.code.codeagent.model.dto.UserLoginRequest;
-import com.code.codeagent.model.dto.UserRegisterRequest;
-import com.code.codeagent.model.dto.UserUpdateMyRequest;
+import com.code.codeagent.model.dto.*;
 import com.code.codeagent.model.entity.User;
 import com.code.codeagent.model.vo.LoginUserVO;
 import com.code.codeagent.model.vo.UserVO;
+import com.code.codeagent.service.MailService;
 import com.code.codeagent.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,11 +27,14 @@ import cn.dev33.satoken.stp.StpUtil;
 @RestController
 @RequestMapping("/user")
 @Slf4j
-@Tag(name = "用户管理", description = "用户相关接口")
+@Tag(name = "userManagement", description = "用户相关接口")
 public class UserController {
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private MailService mailService;
 
     /**
      * 用户注册
@@ -149,6 +151,77 @@ public class UserController {
     public BaseResponse<Boolean> updateMyUser(@Valid @RequestBody UserUpdateMyRequest userUpdateMyRequest) {
         User loginUser = userService.getLoginUser();
         boolean result = userService.updateMyUser(loginUser, userUpdateMyRequest);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 发送验证码
+     *
+     * @param sendCodeRequest 发送验证码请求
+     * @return 是否成功
+     */
+    @PostMapping("/send-code")
+    @Operation(summary = "发送验证码", description = "发送邮箱验证码")
+    public BaseResponse<Boolean> sendCode(@Valid @RequestBody SendCodeRequest sendCodeRequest) {
+        boolean result = mailService.sendVerificationCode(sendCodeRequest.getEmail(), sendCodeRequest.getPurpose());
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 绑定邮箱
+     *
+     * @param bindEmailRequest 绑定邮箱请求
+     * @return 是否成功
+     */
+    @PostMapping("/bind-email")
+    @SaCheckLogin
+    @Operation(summary = "绑定邮箱", description = "绑定邮箱到当前用户")
+    public BaseResponse<Boolean> bindEmail(@Valid @RequestBody BindEmailRequest bindEmailRequest) {
+        User loginUser = userService.getLoginUser();
+        boolean result = userService.bindEmail(loginUser, bindEmailRequest.getEmail(), bindEmailRequest.getCode());
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 修改密码
+     *
+     * @param changePasswordRequest 修改密码请求
+     * @return 是否成功
+     */
+    @PostMapping("/change-password")
+    @SaCheckLogin
+    @Operation(summary = "修改密码", description = "修改当前用户密码")
+    public BaseResponse<Boolean> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest) {
+        // 验证两次密码输入是否一致
+        if (!changePasswordRequest.getNewPassword().equals(changePasswordRequest.getConfirmPassword())) {
+            return ResultUtils.error(40000, "两次输入的新密码不一致");
+        }
+
+        User loginUser = userService.getLoginUser();
+        boolean result = userService.changePassword(loginUser, 
+                changePasswordRequest.getOldPassword(), 
+                changePasswordRequest.getNewPassword());
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 重置密码
+     *
+     * @param resetPasswordRequest 重置密码请求
+     * @return 是否成功
+     */
+    @PostMapping("/reset-password")
+    @Operation(summary = "重置密码", description = "通过邮箱验证码重置密码")
+    public BaseResponse<Boolean> resetPassword(@Valid @RequestBody ResetPasswordRequest resetPasswordRequest) {
+        // 验证两次密码输入是否一致
+        if (!resetPasswordRequest.getNewPassword().equals(resetPasswordRequest.getConfirmPassword())) {
+            return ResultUtils.error(40000, "两次输入的新密码不一致");
+        }
+
+        boolean result = userService.resetPassword(
+                resetPasswordRequest.getEmail(),
+                resetPasswordRequest.getCode(),
+                resetPasswordRequest.getNewPassword());
         return ResultUtils.success(result);
     }
 }

@@ -129,6 +129,12 @@
             <artifactId>spring-boot-starter-aop</artifactId>
         </dependency>
         
+        <!-- 邮件发送 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>

@@ -84,4 +84,34 @@ public interface UserService extends IService<User> {
      * @return 是否成功
      */
     boolean updateMyUser(User loginUser, com.code.codeagent.model.dto.UserUpdateMyRequest userUpdateMyRequest);
+
+    /**
+     * 绑定邮箱
+     *
+     * @param loginUser 当前登录用户
+     * @param email 邮箱地址
+     * @param code 验证码
+     * @return 是否成功
+     */
+    boolean bindEmail(User loginUser, String email, String code);
+
+    /**
+     * 修改密码
+     *
+     * @param loginUser 当前登录用户
+     * @param oldPassword 旧密码
+     * @param newPassword 新密码
+     * @return 是否成功
+     */
+    boolean changePassword(User loginUser, String oldPassword, String newPassword);
+
+    /**
+     * 重置密码
+     *
+     * @param email 邮箱地址
+     * @param code 验证码
+     * @param newPassword 新密码
+     * @return 是否成功
+     */
+    boolean resetPassword(String email, String code, String newPassword);
 }

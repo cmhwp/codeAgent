@@ -5,13 +5,16 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.code.codeagent.common.UserConstant;
+import com.code.codeagent.constant.MailConstant;
+import com.code.codeagent.constant.UserConstant;
 import com.code.codeagent.model.dto.UserUpdateMyRequest;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
+import com.code.codeagent.service.MailService;
 import com.code.codeagent.mapper.UserMapper;
 import com.code.codeagent.model.entity.User;
 import com.code.codeagent.service.UserService;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,9 @@ import java.util.regex.Pattern;
 @Service
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Resource
+    private MailService mailService;
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword, String userName, String userEmail) {
@@ -226,5 +232,117 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         }
         
         return this.updateById(user);
+    }
+
+    @Override
+    public boolean bindEmail(User loginUser, String email, String code) {
+        // 1. 参数校验
+        if (StrUtil.hasBlank(email, code)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "邮箱或验证码不能为空");
+        }
+
+        // 2. 验证邮箱验证码
+        if (!mailService.verifyCode(email, code, MailConstant.Purpose.BIND_EMAIL)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码错误或已过期");
+        }
+
+        // 3. 检查邮箱是否已被其他用户使用
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userEmail", email);
+        queryWrapper.ne("id", loginUser.getId());
+        long count = this.baseMapper.selectCount(queryWrapper);
+        if (count > 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该邮箱已被其他用户使用");
+        }
+
+        // 4. 更新用户邮箱
+        User user = new User();
+        user.setId(loginUser.getId());
+        user.setUserEmail(email);
+        
+        boolean result = this.updateById(user);
+        if (result) {
+            log.info("用户 {} 绑定邮箱成功：{}", loginUser.getId(), email);
+        }
+        
+        return result;
+    }
+
+    @Override
+    public boolean changePassword(User loginUser, String oldPassword, String newPassword) {
+        // 1. 参数校验
+        if (StrUtil.hasBlank(oldPassword, newPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码不能为空");
+        }
+
+        if (newPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码长度不能少于8位");
+        }
+
+        // 2. 验证旧密码
+        String encryptOldPassword = DigestUtil.md5Hex((UserConstant.SALT + oldPassword).getBytes());
+        if (!encryptOldPassword.equals(loginUser.getUserPassword())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "当前密码错误");
+        }
+
+        // 3. 检查新旧密码不能相同
+        if (oldPassword.equals(newPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "新密码不能与当前密码相同");
+        }
+
+        // 4. 加密新密码
+        String encryptNewPassword = DigestUtil.md5Hex((UserConstant.SALT + newPassword).getBytes());
+
+        // 5. 更新密码
+        User user = new User();
+        user.setId(loginUser.getId());
+        user.setUserPassword(encryptNewPassword);
+        
+        boolean result = this.updateById(user);
+        if (result) {
+            log.info("用户 {} 修改密码成功", loginUser.getId());
+        }
+        
+        return result;
+    }
+
+    @Override
+    public boolean resetPassword(String email, String code, String newPassword) {
+        // 1. 参数校验
+        if (StrUtil.hasBlank(email, code, newPassword)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数不能为空");
+        }
+
+        if (newPassword.length() < 8) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码长度不能少于8位");
+        }
+
+        // 2. 验证邮箱验证码
+        if (!mailService.verifyCode(email, code, MailConstant.Purpose.RESET_PASSWORD)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码错误或已过期");
+        }
+
+        // 3. 查找用户
+        QueryWrapper<User> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("userEmail", email);
+        User user = this.baseMapper.selectOne(queryWrapper);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "该邮箱未绑定任何用户");
+        }
+
+        // 4. 加密新密码
+        String encryptPassword = DigestUtil.md5Hex((UserConstant.SALT + newPassword).getBytes());
+
+        // 5. 更新密码
+        User updateUser = new User();
+        updateUser.setId(user.getId());
+        updateUser.setUserPassword(encryptPassword);
+        
+        boolean result = this.updateById(updateUser);
+        if (result) {
+            log.info("用户 {} 重置密码成功", user.getId());
+        }
+        
+        return result;
     }
 }

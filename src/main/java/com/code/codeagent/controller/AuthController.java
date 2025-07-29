@@ -18,7 +18,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/auth")
-@Tag(name = "认证状态", description = "Sa-Token认证状态相关接口")
+@Tag(name = "authStatus", description = "Sa-Token认证状态相关接口")
 @Slf4j
 public class AuthController {
 
