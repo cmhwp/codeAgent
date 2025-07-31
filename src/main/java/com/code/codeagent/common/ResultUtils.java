@@ -83,6 +83,19 @@ public class ResultUtils {
     }
 
     /**
+     * 失败响应（使用错误码枚举、自定义消息和数据）
+     *
+     * @param errorCode 错误码枚举
+     * @param message   自定义错误消息
+     * @param data      响应数据
+     * @param <T>       数据类型
+     * @return 失败响应
+     */
+    public static <T> BaseResponse<T> error(ErrorCode errorCode, String message, T data) {
+        return new BaseResponse<>(errorCode.getCode(), data, message);
+    }
+
+    /**
      * 系统错误响应
      *
      * @return 系统错误响应

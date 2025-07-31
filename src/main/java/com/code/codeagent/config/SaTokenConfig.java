@@ -27,6 +27,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
                     .notMatch("/user/register")     // 排除用户注册接口
                     .notMatch("/auth/**")           // 排除认证状态查询接口
                     .notMatch("/example/**")        // 排除示例接口
+                    .notMatch("/code-generator/health") // 排除代码生成服务健康检查
                     .notMatch("/swagger-ui/**")     // 排除 Swagger UI
                     .notMatch("/swagger-ui.html")   // 排除 Swagger UI
                     .notMatch("/v3/api-docs/**")    // 排除 API 文档

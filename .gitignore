@@ -1,6 +1,6 @@
 HELP.md
 target/
-.mvn/wrapper/maven-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
 
@@ -31,3 +31,14 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Custom ###
+# 生成的代码文件目录
+tmp/
+# 日志文件
+logs/
+# 环境配置文件
+.env
+
+### Local ###
+application-local.yml
