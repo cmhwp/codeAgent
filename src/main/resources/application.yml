@@ -7,6 +7,12 @@ spring:
   profiles:
     active: local
   
+  # Web MVC 配置
+  mvc:
+    # 禁用favicon.ico的自动请求
+    favicon:
+      enabled: false
+  
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -127,6 +133,10 @@ knife4j:
 logging:
   level:
     com.code.codeagent: INFO
+    # 抑制静态资源相关的警告日志
     org.springframework.web.servlet.resource: WARN
+    org.springframework.web.servlet.mvc.method.annotation.ExceptionHandlerExceptionResolver: WARN
+    # 设置根日志级别
+    root: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"

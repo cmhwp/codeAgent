@@ -1,4 +1,4 @@
-package com.code.codeagent.model.dto;
+package com.code.codeagent.model.dto.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -41,4 +41,4 @@ public class UserRegisterRequest implements Serializable {
     @Email(message = "邮箱格式不正确")
     @Size(max = 100, message = "邮箱长度不能超过100字符")
     private String userEmail;
-} 
+}

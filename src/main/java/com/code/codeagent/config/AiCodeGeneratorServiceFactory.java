@@ -2,6 +2,7 @@ package com.code.codeagent.config;
 
 import com.code.codeagent.ai.AiCodeGeneratorService;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.service.AiServices;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,9 @@ public class AiCodeGeneratorServiceFactory {
     @Resource
     private ChatModel chatModel;
 
+    @Resource
+    private StreamingChatModel streamingChatModel;
+
     /**
      * 创建 AI 代码生成服务实例
      *
@@ -29,6 +33,12 @@ public class AiCodeGeneratorServiceFactory {
     @Bean
     public AiCodeGeneratorService aiCodeGeneratorService() {
         log.info("正在初始化 AI 代码生成服务");
-        return AiServices.create(AiCodeGeneratorService.class, chatModel);
+        log.info("chatModel: {}", chatModel != null ? "已注入" : "为空");
+        log.info("streamingChatModel: {}", streamingChatModel != null ? "已注入" : "为空");
+        
+        return AiServices.builder(AiCodeGeneratorService.class)
+                .chatModel(chatModel)
+                .streamingChatModel(streamingChatModel)
+                .build();
     }
 }

@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
  *
  * @author CodeAgent
  */
+@Deprecated
 public class CodeFileSaver {
 
     // 文件保存根目录

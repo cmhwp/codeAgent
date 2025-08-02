@@ -1,4 +1,4 @@
-package com.code.codeagent.model.dto;
+package com.code.codeagent.model.dto.user;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
@@ -26,4 +26,4 @@ public class UpdateUserRoleRequest implements Serializable {
             requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "角色不能为空")
     private String newRole;
-} 
+}

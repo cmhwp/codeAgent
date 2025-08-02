@@ -12,7 +12,9 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import java.util.stream.Collectors;
@@ -89,9 +91,41 @@ public class GlobalExceptionHandler {
      * Sa-Token 其他异常
      */
     @ExceptionHandler(SaTokenException.class)
-    public BaseResponse<?> handlerSaTokenException(SaTokenException e) {
+    public BaseResponse<?> handlerSaTokenException(SaTokenException e, HttpServletRequest request) {
         log.error("SaTokenException", e);
+        
+        // 检查是否是SSE流式请求，如果是则不处理，避免Content-Type冲突
+        String contentType = request.getHeader("Accept");
+        String requestURI = request.getRequestURI();
+        
+        if (contentType != null && contentType.contains("text/event-stream") ||
+            requestURI != null && requestURI.contains("/stream/")) {
+            // 对于SSE请求，让它自己处理异常，不返回JSON响应
+            log.warn("SaToken异常发生在SSE流式请求中，已忽略全局异常处理: {}", requestURI);
+            throw e; // 重新抛出让流式处理器自己处理
+        }
+        
         return ResultUtils.error(40100, "认证失败：" + e.getMessage());
+    }
+
+    /**
+     * 静态资源未找到异常（特殊处理favicon.ico等）
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public BaseResponse<?> handleNoResourceFoundException(NoResourceFoundException e, HttpServletRequest request) {
+        String requestURI = request.getRequestURI();
+        
+        // 对于favicon.ico等常见静态资源请求，不记录错误日志，只记录debug级别
+        if (requestURI != null && (requestURI.endsWith("favicon.ico") || 
+                                  requestURI.endsWith("robots.txt") ||
+                                  requestURI.endsWith("apple-touch-icon.png"))) {
+            log.debug("静态资源未找到（已忽略）: {}", requestURI);
+            return ResultUtils.error(40404, "资源未找到");
+        }
+        
+        // 其他资源未找到仍然记录错误日志
+        log.warn("静态资源未找到: {}", requestURI);
+        return ResultUtils.error(40404, "资源未找到：" + e.getResourcePath());
     }
 
     /**

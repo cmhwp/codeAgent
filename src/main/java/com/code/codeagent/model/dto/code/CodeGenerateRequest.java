@@ -1,4 +1,4 @@
-package com.code.codeagent.model.dto;
+package com.code.codeagent.model.dto.code;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;

@@ -1,8 +1,12 @@
 package com.code.codeagent.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.code.codeagent.common.BaseResponse;
+import com.code.codeagent.common.DeleteRequest;
 import com.code.codeagent.common.ResultUtils;
-import com.code.codeagent.model.dto.*;
+import com.code.codeagent.exception.BusinessException;
+import com.code.codeagent.exception.ErrorCode;
+import com.code.codeagent.model.dto.user.*;
 import com.code.codeagent.constant.PermissionConstant;
 import com.code.codeagent.model.entity.User;
 import com.code.codeagent.model.vo.LoginUserVO;
@@ -22,6 +26,7 @@ import cn.dev33.satoken.annotation.SaCheckRole;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import cn.dev33.satoken.stp.StpUtil;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -297,4 +302,245 @@ public class UserController {
          
          return ResultUtils.success(result);
      }
+
+    // ==================== 管理员功能 ====================
+
+    /**
+     * 管理员分页获取用户列表
+     *
+     * @param userQueryRequest 查询请求
+     * @return 用户列表
+     */
+    @PostMapping("/admin/list/page/vo")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "管理员用户列表", description = "管理员分页获取用户列表")
+    public BaseResponse<Page<UserVO>> listUserVOByPageByAdmin(@Valid @RequestBody UserQueryRequest userQueryRequest) {
+        long pageNum = userQueryRequest.getPageNum();
+        long pageSize = userQueryRequest.getPageSize();
+        
+        // 限制每页最多查询50个用户
+        if (pageSize > 50) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "每页最多查询50个用户");
+        }
+        
+        Page<User> userPage = userService.page(new Page<>(pageNum, pageSize), 
+                userService.getQueryWrapper(userQueryRequest));
+        
+        // 数据封装
+        List<UserVO> userVOList = userService.getUserVOList(userPage.getRecords());
+        
+        Page<UserVO> userVOPage = new Page<>(pageNum, pageSize, userPage.getTotal());
+        userVOPage.setRecords(userVOList);
+        
+        return ResultUtils.success(userVOPage);
+    }
+
+    /**
+     * 管理员更新用户信息
+     *
+     * @param userAdminUpdateRequest 更新请求
+     * @return 更新结果
+     */
+    @PostMapping("/admin/update")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "管理员更新用户", description = "管理员更新用户信息")
+    public BaseResponse<Boolean> updateUserByAdmin(@Valid @RequestBody UserAdminUpdateRequest userAdminUpdateRequest) {
+        Long id = userAdminUpdateRequest.getId();
+        
+        // 判断用户是否存在
+        User oldUser = userService.getById(id);
+        if (oldUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        }
+        
+        // 不能修改自己
+        User loginUser = userService.getLoginUser();
+        if (oldUser.getId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "不能修改自己的信息，请使用个人设置功能");
+        }
+        
+        User user = new User();
+        BeanUtils.copyProperties(userAdminUpdateRequest, user);
+        user.setId(id);
+        user.setEditTime(LocalDateTime.now());
+        
+        // 参数校验
+        userService.validUser(user, false);
+        
+        boolean result = userService.updateUserByAdmin(userAdminUpdateRequest);
+        if (!result) {
+            throw new BusinessException(ErrorCode.OPERATION_ERROR, "更新用户失败");
+        }
+        
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 管理员删除用户
+     *
+     * @param deleteRequest 删除请求
+     * @return 删除结果
+     */
+    @PostMapping("/admin/delete")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "管理员删除用户", description = "管理员删除指定用户")
+    public BaseResponse<Boolean> deleteUserByAdmin(@Valid @RequestBody DeleteRequest deleteRequest) {
+        Long id = deleteRequest.getId();
+        
+        // 判断用户是否存在
+        User oldUser = userService.getById(id);
+        if (oldUser == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        }
+        
+        // 不能删除自己
+        User loginUser = userService.getLoginUser();
+        if (oldUser.getId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "不能删除自己");
+        }
+        
+        // 不能删除其他管理员
+        if (userService.isAdmin(oldUser)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "不能删除管理员账户");
+        }
+        
+        boolean result = userService.deleteUserByAdmin(id);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 批量操作用户
+     *
+     * @param batchUserOperationRequest 批量操作请求
+     * @return 操作结果
+     */
+    @PostMapping("/admin/batch-operation")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "批量操作用户", description = "批量删除、封禁、解封用户")
+    public BaseResponse<Map<String, Object>> batchOperateUsers(@Valid @RequestBody BatchUserOperationRequest batchUserOperationRequest) {
+        // 限制批量操作数量
+        if (batchUserOperationRequest.getUserIds().size() > 100) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "单次最多操作100个用户");
+        }
+        
+        User loginUser = userService.getLoginUser();
+        
+        // 检查是否包含自己
+        if (batchUserOperationRequest.getUserIds().contains(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "不能对自己执行批量操作");
+        }
+        
+        Map<String, Object> result = userService.batchOperateUsers(batchUserOperationRequest);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 强制用户下线
+     *
+     * @param userId 用户ID
+     * @return 操作结果
+     */
+    @PostMapping("/admin/kickout")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "强制用户下线", description = "强制指定用户下线")
+    public BaseResponse<Boolean> kickoutUser(@RequestParam Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID无效");
+        }
+        
+        // 判断用户是否存在
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        }
+        
+        // 不能踢掉自己
+        User loginUser = userService.getLoginUser();
+        if (user.getId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "不能强制自己下线");
+        }
+        
+        boolean result = userService.kickoutUser(userId);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 封禁用户
+     *
+     * @param userId 用户ID
+     * @return 操作结果
+     */
+    @PostMapping("/admin/ban")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "封禁用户", description = "封禁指定用户")
+    public BaseResponse<Boolean> banUser(@RequestParam Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID无效");
+        }
+        
+        // 判断用户是否存在
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        }
+        
+        // 不能封禁自己
+        User loginUser = userService.getLoginUser();
+        if (user.getId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "不能封禁自己");
+        }
+        
+        // 不能封禁其他管理员
+        if (userService.isAdmin(user)) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "不能封禁管理员账户");
+        }
+        
+        boolean result = userService.banUser(userId);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 解封用户
+     *
+     * @param userId 用户ID
+     * @return 操作结果
+     */
+    @PostMapping("/admin/unban")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "解封用户", description = "解封指定用户")
+    public BaseResponse<Boolean> unbanUser(@RequestParam Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "用户ID无效");
+        }
+        
+        // 判断用户是否存在
+        User user = userService.getById(userId);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        }
+        
+        boolean result = userService.unbanUser(userId);
+        return ResultUtils.success(result);
+    }
+
+    /**
+     * 获取用户统计信息
+     *
+     * @return 统计信息
+     */
+    @GetMapping("/admin/stats")
+    @SaCheckLogin
+    @SaCheckRole("admin")
+    @Operation(summary = "用户统计", description = "获取用户统计信息")
+    public BaseResponse<Map<String, Object>> getUserStats() {
+        Map<String, Object> stats = userService.getUserStats();
+        return ResultUtils.success(stats);
+    }
  }

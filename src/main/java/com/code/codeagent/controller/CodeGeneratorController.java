@@ -1,10 +1,11 @@
 package com.code.codeagent.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
+
 import com.code.codeagent.common.BaseResponse;
 import com.code.codeagent.common.ResultUtils;
 import com.code.codeagent.core.AiCodeGeneratorFacade;
-import com.code.codeagent.model.dto.CodeGenerateRequest;
+import com.code.codeagent.model.dto.code.CodeGenerateRequest;
 import com.code.codeagent.model.enums.CodeGenTypeEnum;
 import com.code.codeagent.model.vo.CodeGenerateVO;
 import com.code.codeagent.exception.BusinessException;
@@ -90,6 +91,8 @@ public class CodeGeneratorController {
     public BaseResponse<CodeGenTypeEnum[]> getCodeGenTypes() {
         return ResultUtils.success(CodeGenTypeEnum.values());
     }
+
+
 
     /**
      * 健康检查

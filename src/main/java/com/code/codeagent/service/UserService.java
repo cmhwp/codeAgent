@@ -2,8 +2,15 @@ package com.code.codeagent.service;
 
 import com.code.codeagent.model.entity.User;
 import com.baomidou.mybatisplus.extension.service.IService;
-
+import com.code.codeagent.model.dto.user.UserUpdateMyRequest;
+import com.code.codeagent.model.dto.user.UserQueryRequest;
+import com.code.codeagent.model.dto.user.UserAdminUpdateRequest;
+import com.code.codeagent.model.dto.user.BatchUserOperationRequest;
+import com.code.codeagent.model.vo.UserVO;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户服务接口
@@ -85,7 +92,7 @@ public interface UserService extends IService<User> {
      * @param userUpdateMyRequest 更新请求
      * @return 是否成功
      */
-    boolean updateMyUser(User loginUser, com.code.codeagent.model.dto.UserUpdateMyRequest userUpdateMyRequest);
+    boolean updateMyUser(User loginUser, UserUpdateMyRequest userUpdateMyRequest);
 
     /**
      * 绑定邮箱
@@ -141,4 +148,91 @@ public interface UserService extends IService<User> {
      * @return 权限列表
      */
     List<String> getUserPermissions(Long userId);
+
+    /**
+     * 获取用户查询条件
+     *
+     * @param userQueryRequest 查询请求
+     * @return 查询条件
+     */
+    QueryWrapper<User> getQueryWrapper(UserQueryRequest userQueryRequest);
+
+    /**
+     * 管理员更新用户信息
+     *
+     * @param userAdminUpdateRequest 更新请求
+     * @return 是否成功
+     */
+    boolean updateUserByAdmin(UserAdminUpdateRequest userAdminUpdateRequest);
+
+    /**
+     * 管理员删除用户
+     *
+     * @param userId 用户ID
+     * @return 是否成功
+     */
+    boolean deleteUserByAdmin(Long userId);
+
+    /**
+     * 批量操作用户
+     *
+     * @param batchUserOperationRequest 批量操作请求
+     * @return 操作结果
+     */
+    Map<String, Object> batchOperateUsers(BatchUserOperationRequest batchUserOperationRequest);
+
+    /**
+     * 强制用户下线
+     *
+     * @param userId 用户ID
+     * @return 是否成功
+     */
+    boolean kickoutUser(Long userId);
+
+    /**
+     * 获取用户统计信息
+     *
+     * @return 统计信息
+     */
+    Map<String, Object> getUserStats();
+
+    /**
+     * 封禁用户
+     *
+     * @param userId 用户ID
+     * @return 是否成功
+     */
+    boolean banUser(Long userId);
+
+    /**
+     * 解封用户
+     *
+     * @param userId 用户ID
+     * @return 是否成功
+     */
+    boolean unbanUser(Long userId);
+
+    /**
+     * 获取用户VO对象
+     *
+     * @param user 用户实体
+     * @return 用户VO
+     */
+    UserVO getUserVO(User user);
+
+    /**
+     * 获取用户VO列表
+     *
+     * @param userList 用户列表
+     * @return 用户VO列表
+     */
+    List<UserVO> getUserVOList(List<User> userList);
+
+    /**
+     * 校验用户参数
+     *
+     * @param user 用户对象
+     * @param add 是否为新增
+     */
+    void validUser(User user, boolean add);
 }
