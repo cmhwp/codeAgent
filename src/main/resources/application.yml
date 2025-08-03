@@ -7,12 +7,6 @@ spring:
   profiles:
     active: local
   
-  # Web MVC 配置
-  mvc:
-    # 禁用favicon.ico的自动请求
-    favicon:
-      enabled: false
-  
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

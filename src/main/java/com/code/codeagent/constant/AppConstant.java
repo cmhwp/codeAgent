@@ -13,6 +13,16 @@ public interface AppConstant {
     String CODE_OUTPUT_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_output";
 
     /**
+     * 代码部署根目录
+     */
+    String CODE_DEPLOY_ROOT_DIR = System.getProperty("user.dir") + "/tmp/code_deploy";
+
+    /**
+     * 应用部署域名
+     */
+    String APP_DEPLOY_DOMAIN = "http://localhost";
+
+    /**
      * 精选应用的优先级
      */
     int GOOD_APP_PRIORITY = 1;
