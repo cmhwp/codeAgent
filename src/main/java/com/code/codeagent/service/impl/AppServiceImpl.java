@@ -15,10 +15,12 @@ import com.code.codeagent.mapper.AppMapper;
 import com.code.codeagent.model.dto.app.AppQueryRequest;
 import com.code.codeagent.model.entity.App;
 import com.code.codeagent.model.entity.User;
+import com.code.codeagent.model.enums.ChatHistoryMessageTypeEnum;
 import com.code.codeagent.model.enums.CodeGenTypeEnum;
 import com.code.codeagent.model.vo.AppVO;
 import com.code.codeagent.model.vo.UserVO;
 import com.code.codeagent.service.AppService;
+import com.code.codeagent.service.ChatHistoryService;
 import com.code.codeagent.service.UserService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +53,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private AiCodeGeneratorFacade aiCodeGeneratorFacade;
 
+    @Resource
+    private ChatHistoryService chatHistoryService;
+
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
         // 1. 参数校验
@@ -71,9 +76,117 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         ThrowUtils.throwIfNull(codeGenTypeEnum, ErrorCode.PARAMS_ERROR, "应用代码生成类型错误");
         
-        // 5. 调用 AI 生成代码
+        // 5. 记录用户消息到对话历史
+        Long userMessageId = chatHistoryService.addChatMessage(
+                appId, 
+                message, 
+                ChatHistoryMessageTypeEnum.USER.getValue(), 
+                loginUser.getId(), 
+                null
+        );
+        
+        // 6. 调用 AI 生成代码（流式响应）
         log.info("开始为应用生成代码，应用ID：{}，用户ID：{}，消息长度：{}", appId, loginUser.getId(), message.length());
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
+        
+        // 用于收集AI响应内容
+        StringBuilder aiResponseBuilder = new StringBuilder();
+        
+        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId)
+                .doOnNext(chunk -> {
+                    // 实时收集 AI 响应的内容
+                    aiResponseBuilder.append(chunk);
+                })
+                .doOnComplete(() -> {
+                    // 流完成时，保存完整的AI消息到对话历史
+                    try {
+                        String aiResponse = aiResponseBuilder.toString();
+                        if (!aiResponse.trim().isEmpty()) {
+                            chatHistoryService.addChatMessage(
+                                    appId,
+                                    aiResponse,
+                                    ChatHistoryMessageTypeEnum.AI.getValue(),
+                                    loginUser.getId(),
+                                    userMessageId
+                            );
+                        }
+                        log.info("AI代码生成完成，应用ID：{}，用户消息ID：{}", appId, userMessageId);
+                    } catch (Exception e) {
+                        log.error("保存AI响应到对话历史失败，应用ID：{}，用户消息ID：{}，错误：{}", appId, userMessageId, e.getMessage());
+                    }
+                })
+                .doOnError(error -> {
+                    // 如果 AI 回复失败，也记录错误消息到对话历史
+                    try {
+                        String errorMessage = "AI 回复失败：" + error.getMessage();
+                        chatHistoryService.addChatMessage(
+                                appId,
+                                errorMessage,
+                                ChatHistoryMessageTypeEnum.AI.getValue(),
+                                loginUser.getId(),
+                                userMessageId
+                        );
+                    } catch (Exception e) {
+                        log.error("保存AI错误响应到对话历史失败，应用ID：{}，用户消息ID：{}，错误：{}", appId, userMessageId, e.getMessage());
+                    }
+                    log.error("AI代码生成失败，应用ID：{}，用户消息ID：{}，错误：{}", appId, userMessageId, error.getMessage());
+                });
+    }
+
+    @Override
+    public Flux<String> retryGenerateCode(Long appId, String message, User loginUser, Long parentMessageId) {
+        // 1. 参数校验
+        ThrowUtils.throwIfNotPositive(appId, ErrorCode.PARAMS_ERROR, "应用ID错误");
+        ThrowUtils.throwIfBlank(message, ErrorCode.PARAMS_ERROR, "提示词不能为空");
+        ThrowUtils.throwIfNull(loginUser, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        ThrowUtils.throwIfNotPositive(parentMessageId, ErrorCode.PARAMS_ERROR, "父消息ID错误");
+        
+        // 2. 查询应用信息
+        App app = this.getById(appId);
+        ThrowUtils.throwIfNull(app, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        
+        // 3. 权限校验，仅本人可以和自己的应用对话
+        ThrowUtils.throwIfNotEquals(app.getUserId(), loginUser.getId(), ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
+        
+        // 4. 获取应用的代码生成类型
+        String codeGenType = app.getCodeGenType();
+        ThrowUtils.throwIfBlank(codeGenType, ErrorCode.PARAMS_ERROR, "应用代码生成类型为空");
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        ThrowUtils.throwIfNull(codeGenTypeEnum, ErrorCode.PARAMS_ERROR, "应用代码生成类型错误");
+        
+        // 5. 删除原有的AI回复（重试时清理）
+        chatHistoryService.deleteAiRepliesByParentId(parentMessageId);
+        
+        // 6. 调用 AI 重新生成代码（流式响应）
+        log.info("开始重新生成代码，应用ID：{}，用户ID：{}，父消息ID：{}", appId, loginUser.getId(), parentMessageId);
+        
+        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId)
+                .collectList() // 收集所有chunk
+                .flatMapMany(chunks -> {
+                    // 合并所有chunk为完整响应
+                    String fullResponse = String.join("", chunks);
+                    
+                    // 记录AI消息到对话历史
+                    try {
+                        if (!fullResponse.trim().isEmpty()) {
+                            chatHistoryService.addChatMessage(
+                                    appId,
+                                    fullResponse,
+                                    ChatHistoryMessageTypeEnum.AI.getValue(),
+                                    loginUser.getId(),
+                                    parentMessageId
+                            );
+                        }
+                        log.info("AI代码重新生成完成，应用ID：{}，父消息ID：{}", appId, parentMessageId);
+                    } catch (Exception e) {
+                        log.error("记录AI回复失败，应用ID：{}，父消息ID：{}，错误：{}", appId, parentMessageId, e.getMessage());
+                    }
+                    
+                    // 返回流式数据
+                    return Flux.fromIterable(chunks);
+                })
+                .doOnError(error -> {
+                    log.error("AI代码重新生成失败，应用ID：{}，父消息ID：{}，错误：{}", appId, parentMessageId, error.getMessage());
+                });
     }
 
     @Override
@@ -263,6 +376,38 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         
         return queryWrapper;
+    }
+
+    /**
+     * 删除应用时，关联删除对话历史
+     */
+    @Override
+    public boolean removeById(java.io.Serializable id) {
+        if (id == null) {
+            return false;
+        }
+        long appId;
+        try {
+            appId = Long.parseLong(id.toString());
+            if (appId <= 0) {
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            log.error("删除应用时，ID格式错误：{}", id);
+            return false;
+        }
+        
+        // 先删除关联的对话历史
+        try {
+            chatHistoryService.deleteByAppId(appId);
+            log.info("成功删除应用关联的对话历史，应用ID：{}", appId);
+        } catch (Exception e) {
+            log.error("删除应用关联的对话历史失败，应用ID：{}，错误：{}", appId, e.getMessage());
+            // 这里不抛异常，继续删除应用本身
+        }
+        
+        // 删除应用
+        return super.removeById(id);
     }
 
     @Override

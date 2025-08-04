@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.code.codeagent.common.BaseResponse;
 import com.code.codeagent.common.DeleteRequest;
 import com.code.codeagent.common.ResultUtils;
+import com.code.codeagent.constant.UserConstant;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
 import com.code.codeagent.model.dto.user.*;
@@ -127,7 +128,7 @@ public class UserController {
      */
     @GetMapping("/get")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "根据id获取用户", description = "根据id获取用户（仅管理员）")
     public BaseResponse<User> getUserById(long id) {
         User user = userService.getById(id);
@@ -246,7 +247,7 @@ public class UserController {
       */
      @PostMapping("/update-role")
      @SaCheckLogin
-     @SaCheckRole("admin")
+     @SaCheckRole(UserConstant.ADMIN_ROLE)
      @Operation(summary = "更新用户角色", description = "更新指定用户的角色（仅管理员）")
      public BaseResponse<Boolean> updateUserRole(@Valid @RequestBody UpdateUserRoleRequest updateUserRoleRequest) {
          boolean result = userService.updateUserRole(
@@ -313,7 +314,7 @@ public class UserController {
      */
     @PostMapping("/admin/list/page/vo")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员用户列表", description = "管理员分页获取用户列表")
     public BaseResponse<Page<UserVO>> listUserVOByPageByAdmin(@Valid @RequestBody UserQueryRequest userQueryRequest) {
         long pageNum = userQueryRequest.getPageNum();
@@ -344,7 +345,7 @@ public class UserController {
      */
     @PostMapping("/admin/update")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员更新用户", description = "管理员更新用户信息")
     public BaseResponse<Boolean> updateUserByAdmin(@Valid @RequestBody UserAdminUpdateRequest userAdminUpdateRequest) {
         Long id = userAdminUpdateRequest.getId();
@@ -385,7 +386,7 @@ public class UserController {
      */
     @PostMapping("/admin/delete")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员删除用户", description = "管理员删除指定用户")
     public BaseResponse<Boolean> deleteUserByAdmin(@Valid @RequestBody DeleteRequest deleteRequest) {
         Long id = deleteRequest.getId();
@@ -419,7 +420,7 @@ public class UserController {
      */
     @PostMapping("/admin/batch-operation")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "批量操作用户", description = "批量删除、封禁、解封用户")
     public BaseResponse<Map<String, Object>> batchOperateUsers(@Valid @RequestBody BatchUserOperationRequest batchUserOperationRequest) {
         // 限制批量操作数量
@@ -446,7 +447,7 @@ public class UserController {
      */
     @PostMapping("/admin/kickout")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "强制用户下线", description = "强制指定用户下线")
     public BaseResponse<Boolean> kickoutUser(@RequestParam Long userId) {
         if (userId == null || userId <= 0) {
@@ -477,7 +478,7 @@ public class UserController {
      */
     @PostMapping("/admin/ban")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "封禁用户", description = "封禁指定用户")
     public BaseResponse<Boolean> banUser(@RequestParam Long userId) {
         if (userId == null || userId <= 0) {
@@ -513,7 +514,7 @@ public class UserController {
      */
     @PostMapping("/admin/unban")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "解封用户", description = "解封指定用户")
     public BaseResponse<Boolean> unbanUser(@RequestParam Long userId) {
         if (userId == null || userId <= 0) {
@@ -537,7 +538,7 @@ public class UserController {
      */
     @GetMapping("/admin/stats")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "用户统计", description = "获取用户统计信息")
     public BaseResponse<Map<String, Object>> getUserStats() {
         Map<String, Object> stats = userService.getUserStats();

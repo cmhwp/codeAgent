@@ -22,6 +22,7 @@ spring:
       password: 
       database: 0
       timeout: 10s
+      ttl: 3600  # 对话记忆TTL，单位：秒（1小时）
       lettuce:
         pool:
           # 连接池最大连接数
@@ -76,7 +77,7 @@ mybatis-plus:
 # Sa-Token配置
 sa-token:
   # token 名称（同时也是 cookie 名称）
-  token-name: satoken
+  token-name: Authorization
   # token 有效期（单位：秒） 默认30天，-1 代表永久有效
   timeout: 2592000
   # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
@@ -122,6 +123,15 @@ knife4j:
     enable-swagger-models: true
     enable-document-manage: true
     swagger-model-name: 实体类列表
+
+# LangChain4j Redis 配置
+langchain4j:
+  redis:
+    host: localhost
+    port: 6379
+    password: 
+    database: 0
+    ttl: 3600  # TTL in seconds (1 hour)
 
 # 日志配置
 logging:

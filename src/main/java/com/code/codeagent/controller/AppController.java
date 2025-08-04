@@ -7,6 +7,7 @@ import com.code.codeagent.common.BaseResponse;
 import com.code.codeagent.common.DeleteRequest;
 import com.code.codeagent.common.ResultUtils;
 import com.code.codeagent.constant.AppConstant;
+import com.code.codeagent.constant.UserConstant;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
 import com.code.codeagent.model.dto.app.*;
@@ -324,7 +325,7 @@ public class AppController {
      */
     @PostMapping("/admin/delete")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员删除应用", description = "管理员删除指定应用")
     public BaseResponse<Boolean> deleteAppByAdmin(@Valid @RequestBody DeleteRequest deleteRequest) {
         Long id = deleteRequest.getId();
@@ -347,7 +348,7 @@ public class AppController {
      */
     @PostMapping("/admin/update")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员更新应用", description = "管理员更新应用信息")
     public BaseResponse<Boolean> updateAppByAdmin(@Valid @RequestBody AppAdminUpdateRequest appAdminUpdateRequest) {
         Long id = appAdminUpdateRequest.getId();
@@ -382,7 +383,7 @@ public class AppController {
      */
     @PostMapping("/admin/list/page/vo")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员应用列表", description = "管理员分页获取应用列表")
     public BaseResponse<Page<AppVO>> listAppVOByPageByAdmin(@Valid @RequestBody AppQueryRequest appQueryRequest) {
         long pageNum = appQueryRequest.getPageNum();
@@ -408,7 +409,7 @@ public class AppController {
      */
     @GetMapping("/admin/get/vo")
     @SaCheckLogin
-    @SaCheckRole("admin")
+    @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "管理员获取应用详情", description = "管理员根据ID获取应用详细信息")
     public BaseResponse<AppVO> getAppVOByIdByAdmin(@RequestParam long id) {
         if (id <= 0) {

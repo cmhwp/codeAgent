@@ -94,6 +94,20 @@
             <artifactId>commons-pool2</artifactId>
         </dependency>
         
+        <!-- LangChain4j Redis 社区版支持 -->
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-community-redis-spring-boot-starter</artifactId>
+            <version>1.1.0-beta7</version>
+        </dependency>
+        
+        
+        <!-- Caffeine 本地缓存 -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+        
         <!-- MyBatis Plus -->
         <dependency>
             <groupId>com.baomidou</groupId>
