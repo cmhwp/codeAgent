@@ -1,5 +1,6 @@
 package com.code.codeagent.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -10,16 +11,18 @@ import com.code.codeagent.constant.AppConstant;
 import com.code.codeagent.constant.UserConstant;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
+import com.code.codeagent.exception.ThrowUtils;
 import com.code.codeagent.model.dto.app.*;
 import com.code.codeagent.model.entity.App;
 import com.code.codeagent.model.entity.User;
-import com.code.codeagent.model.enums.CodeGenTypeEnum;
 import com.code.codeagent.model.vo.AppVO;
 import com.code.codeagent.service.AppService;
+import com.code.codeagent.service.ProjectDownloadService;
 import com.code.codeagent.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.annotation.Resource;
+import jakarta.annotation.Resource; 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -31,6 +34,7 @@ import reactor.core.publisher.Mono;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckRole;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +56,8 @@ public class AppController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private ProjectDownloadService projectDownloadService;
     /**
      * 通过对话生成应用代码（流式响应）
      *
@@ -60,10 +66,16 @@ public class AppController {
      * @return 流式响应
      */
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @SaCheckLogin
     @Operation(summary = "对话生成代码", description = "通过对话生成应用代码（流式响应）")
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message) {
+        // 手动进行认证检查，避免在流式响应中的上下文问题
+        try {
+            StpUtil.checkLogin();
+        } catch (Exception e) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        }
+        
         // 参数校验
         if (appId == null || appId <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "应用ID错误");
@@ -72,7 +84,7 @@ public class AppController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "提示词不能为空");
         }
         
-        // 获取当前登录用户
+        // 在流式响应开始前获取用户信息，避免异步上下文问题
         User loginUser = userService.getLoginUser();
         
         // 调用服务生成代码（SSE 流式返回）
@@ -91,7 +103,10 @@ public class AppController {
                                 .event("done")
                                 .data("")
                                 .build()
-                ));
+                ))
+                .doOnError(error -> {
+                    log.error("流式代码生成过程中发生错误，应用ID：{}，错误：{}", appId, error.getMessage(), error);
+                });
     }
 
     /**
@@ -125,37 +140,13 @@ public class AppController {
     @SaCheckLogin
     @Operation(summary = "创建应用", description = "创建新的应用")
     public BaseResponse<Long> addApp(@Valid @RequestBody AppAddRequest appAddRequest) {
+        ThrowUtils.throwIf(appAddRequest == null, ErrorCode.PARAMS_ERROR, "创建应用请求不能为空");
         // 获取当前登录用户
         User loginUser = userService.getLoginUser();
         
-        // 构造入库对象
-        App app = new App();
-        BeanUtils.copyProperties(appAddRequest, app);
-        app.setUserId(loginUser.getId());
+        Long appId = appService.addApp(appAddRequest, loginUser);
         
-        // 应用名称暂时为 initPrompt 前几位字符
-        String initPrompt = appAddRequest.getInitPrompt();
-        String appName = initPrompt.substring(0, Math.min(initPrompt.length(), AppConstant.DEFAULT_APP_NAME_MAX_LENGTH));
-        app.setAppName(appName);
-        
-        // 如果没有指定代码生成类型，默认设置为多文件生成
-        if (StrUtil.isBlank(app.getCodeGenType())) {
-            app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
-        }
-        
-        // 设置默认优先级
-        app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
-        
-        // 参数校验
-        appService.validApp(app, true);
-        
-        // 插入数据库
-        boolean result = appService.save(app);
-        if (!result) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "创建应用失败");
-        }
-        
-        return ResultUtils.success(app.getId());
+        return ResultUtils.success(appId);
     }
 
     /**
@@ -196,6 +187,41 @@ public class AppController {
         }
         
         return ResultUtils.success(true);
+    }
+
+    /**
+     * 下载应用代码
+     *
+     * @param appId    应用ID
+     * @param response 响应
+     */
+    @GetMapping("/download/{appId}")
+    @SaCheckLogin
+    @Operation(summary = "下载应用代码", description = "下载应用代码")
+    public void downloadAppCode(@PathVariable Long appId,
+                                HttpServletResponse response) {
+        // 1. 基础校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        // 2. 查询应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 3. 权限校验：只有应用创建者可以下载代码
+        User loginUser = userService.getLoginUser();
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限下载该应用代码");
+        }
+        // 4. 构建应用代码目录路径（生成目录，非部署目录）
+        String codeGenType = app.getCodeGenType();
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+        // 5. 检查代码目录是否存在
+        File sourceDir = new File(sourceDirPath);
+        ThrowUtils.throwIf(!sourceDir.exists() || !sourceDir.isDirectory(),
+                ErrorCode.NOT_FOUND_ERROR, "应用代码不存在，请先生成代码");
+        // 6. 生成下载文件名（不建议添加中文内容）
+        String downloadFileName = String.valueOf(appId);
+        // 7. 调用通用下载服务
+        projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
     }
 
     /**

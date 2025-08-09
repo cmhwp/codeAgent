@@ -8,10 +8,14 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.code.codeagent.constant.AppConstant;
 import com.code.codeagent.core.AiCodeGeneratorFacade;
+import com.code.codeagent.core.builder.VueProjectBuilder;
+import com.code.codeagent.core.handler.StreamHandlerExecutor;
+import com.code.codeagent.ai.AiCodeGenTypeRoutingService;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
 import com.code.codeagent.exception.ThrowUtils;
 import com.code.codeagent.mapper.AppMapper;
+import com.code.codeagent.model.dto.app.AppAddRequest;
 import com.code.codeagent.model.dto.app.AppQueryRequest;
 import com.code.codeagent.model.entity.App;
 import com.code.codeagent.model.entity.User;
@@ -22,6 +26,7 @@ import com.code.codeagent.model.vo.UserVO;
 import com.code.codeagent.service.AppService;
 import com.code.codeagent.service.ChatHistoryService;
 import com.code.codeagent.service.UserService;
+import com.code.codeagent.service.ScreenshotService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
@@ -56,6 +61,18 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     @Resource
     private ChatHistoryService chatHistoryService;
 
+    @Resource
+    private StreamHandlerExecutor streamHandlerExecutor;
+
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private ScreenshotService screenshotService;
+
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+
     @Override
     public Flux<String> chatToGenCode(Long appId, String message, User loginUser) {
         // 1. 参数校验
@@ -76,60 +93,15 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         ThrowUtils.throwIfNull(codeGenTypeEnum, ErrorCode.PARAMS_ERROR, "应用代码生成类型错误");
         
-        // 5. 记录用户消息到对话历史
-        Long userMessageId = chatHistoryService.addChatMessage(
-                appId, 
-                message, 
-                ChatHistoryMessageTypeEnum.USER.getValue(), 
-                loginUser.getId(), 
-                null
-        );
+        // 5. 在调用 AI 前，先保存用户消息到数据库中
+        Long userMessageId = chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId(), null);
         
-        // 6. 调用 AI 生成代码（流式响应）
+        // 6. 调用 AI 生成代码（流式）
         log.info("开始为应用生成代码，应用ID：{}，用户ID：{}，消息长度：{}", appId, loginUser.getId(), message.length());
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
         
-        // 用于收集AI响应内容
-        StringBuilder aiResponseBuilder = new StringBuilder();
-        
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId)
-                .doOnNext(chunk -> {
-                    // 实时收集 AI 响应的内容
-                    aiResponseBuilder.append(chunk);
-                })
-                .doOnComplete(() -> {
-                    // 流完成时，保存完整的AI消息到对话历史
-                    try {
-                        String aiResponse = aiResponseBuilder.toString();
-                        if (!aiResponse.trim().isEmpty()) {
-                            chatHistoryService.addChatMessage(
-                                    appId,
-                                    aiResponse,
-                                    ChatHistoryMessageTypeEnum.AI.getValue(),
-                                    loginUser.getId(),
-                                    userMessageId
-                            );
-                        }
-                        log.info("AI代码生成完成，应用ID：{}，用户消息ID：{}", appId, userMessageId);
-                    } catch (Exception e) {
-                        log.error("保存AI响应到对话历史失败，应用ID：{}，用户消息ID：{}，错误：{}", appId, userMessageId, e.getMessage());
-                    }
-                })
-                .doOnError(error -> {
-                    // 如果 AI 回复失败，也记录错误消息到对话历史
-                    try {
-                        String errorMessage = "AI 回复失败：" + error.getMessage();
-                        chatHistoryService.addChatMessage(
-                                appId,
-                                errorMessage,
-                                ChatHistoryMessageTypeEnum.AI.getValue(),
-                                loginUser.getId(),
-                                userMessageId
-                        );
-                    } catch (Exception e) {
-                        log.error("保存AI错误响应到对话历史失败，应用ID：{}，用户消息ID：{}，错误：{}", appId, userMessageId, e.getMessage());
-                    }
-                    log.error("AI代码生成失败，应用ID：{}，用户消息ID：{}，错误：{}", appId, userMessageId, error.getMessage());
-                });
+        // 7. 收集 AI 响应的内容，并且在完成后保存记录到对话历史
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum, userMessageId);
     }
 
     @Override
@@ -158,35 +130,10 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         
         // 6. 调用 AI 重新生成代码（流式响应）
         log.info("开始重新生成代码，应用ID：{}，用户ID：{}，父消息ID：{}", appId, loginUser.getId(), parentMessageId);
+        Flux<String> codeStream = aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId);
         
-        return aiCodeGeneratorFacade.generateAndSaveCodeStream(message, codeGenTypeEnum, appId)
-                .collectList() // 收集所有chunk
-                .flatMapMany(chunks -> {
-                    // 合并所有chunk为完整响应
-                    String fullResponse = String.join("", chunks);
-                    
-                    // 记录AI消息到对话历史
-                    try {
-                        if (!fullResponse.trim().isEmpty()) {
-                            chatHistoryService.addChatMessage(
-                                    appId,
-                                    fullResponse,
-                                    ChatHistoryMessageTypeEnum.AI.getValue(),
-                                    loginUser.getId(),
-                                    parentMessageId
-                            );
-                        }
-                        log.info("AI代码重新生成完成，应用ID：{}，父消息ID：{}", appId, parentMessageId);
-                    } catch (Exception e) {
-                        log.error("记录AI回复失败，应用ID：{}，父消息ID：{}，错误：{}", appId, parentMessageId, e.getMessage());
-                    }
-                    
-                    // 返回流式数据
-                    return Flux.fromIterable(chunks);
-                })
-                .doOnError(error -> {
-                    log.error("AI代码重新生成失败，应用ID：{}，父消息ID：{}，错误：{}", appId, parentMessageId, error.getMessage());
-                });
+        // 7. 使用 StreamHandlerExecutor 处理流，AI回复会关联到原始用户消息
+        return streamHandlerExecutor.doExecute(codeStream, chatHistoryService, appId, loginUser, codeGenTypeEnum, parentMessageId);
     }
 
     @Override
@@ -233,6 +180,19 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(files == null || files.length == 0, 
                           ErrorCode.SYSTEM_ERROR, "应用代码目录为空，请先生成应用");
         
+        //vue项目需要额外处理
+        CodeGenTypeEnum vueProject = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        if (vueProject == CodeGenTypeEnum.VUE_PROJECT) {
+            // 1. 构建vue项目
+            Boolean buildResult = vueProjectBuilder.buildProject(sourceDirPath);
+            ThrowUtils.throwIf(!buildResult, ErrorCode.SYSTEM_ERROR, "应用构建失败，请重试！");
+            // 2. 检查构建目录是否存在
+            File distDir = new File(sourceDirPath,"dist");
+            ThrowUtils.throwIf(!distDir.exists(), ErrorCode.SYSTEM_ERROR, "应用构建失败，未生成dist目录，请重试！");
+            // 3. 复制文件到部署目录
+            sourceDir = distDir;
+        }
+        
         // 8. 创建部署目录并复制文件
         String deployDirPath = AppConstant.CODE_DEPLOY_ROOT_DIR + File.separator + deployKey;
         File deployDir = new File(deployDirPath);
@@ -265,10 +225,61 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         
         // 10. 返回可访问的 URL 地址
         String deployUrl = String.format("%s/%s", AppConstant.APP_DEPLOY_DOMAIN, deployKey);
-        log.info("应用部署成功，应用ID：{}，访问地址：{}", appId, deployUrl);
+        log.info("应用部署成功，应用ID：{}，访问地址：{}", appId, deployUrl);        
+        // 11. 异步生成应用截图
+        generateScreenshotAsync(appId, deployUrl);
         return deployUrl;
     }
+
+    @Override
+    public Long addApp(AppAddRequest appAddRequest, User loginUser) {
+         // 构造入库对象
+         App app = new App();
+         BeanUtils.copyProperties(appAddRequest, app);
+         app.setUserId(loginUser.getId());
+         
+         // 应用名称暂时为 initPrompt 前几位字符
+         String initPrompt = appAddRequest.getInitPrompt();
+         String appName = initPrompt.substring(0, Math.min(initPrompt.length(), AppConstant.DEFAULT_APP_NAME_MAX_LENGTH));
+         app.setAppName(appName);
+         
+         CodeGenTypeEnum codeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(appAddRequest.getInitPrompt());    
+         app.setCodeGenType(codeGenType.getValue());
+         
+         // 设置默认优先级
+         app.setPriority(AppConstant.DEFAULT_APP_PRIORITY);
+         
+                 // 参数校验
+        this.validApp(app, true);
+        
+        // 插入数据库
+        boolean result = this.save(app);
+         if (!result) {
+             throw new BusinessException(ErrorCode.OPERATION_ERROR, "创建应用失败");
+         }
+         return app.getId();
+    }
+
+    /**
+     * 异步生成应用截图
+     * @param appId 应用ID
+     * @param deployUrl 部署URL
+     */
     
+    public void generateScreenshotAsync(Long appId, String deployUrl) {
+        // 1. 参数校验
+        ThrowUtils.throwIfNotPositive(appId, ErrorCode.PARAMS_ERROR, "应用ID错误");
+        ThrowUtils.throwIfBlank(deployUrl, ErrorCode.PARAMS_ERROR, "部署URL不能为空");
+        // 2. 异步生成应用截图
+        Thread.startVirtualThread(()->{
+            String screenshotUrl = screenshotService.generateAndUploadScreenshot(deployUrl);
+            App updateApp = new App();
+            updateApp.setId(appId);
+            updateApp.setCover(screenshotUrl);
+            boolean updateResult = this.updateById(updateApp);
+            ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用截图信息失败");
+        });
+    }
     /**
      * 检查 deployKey 是否已存在
      * 

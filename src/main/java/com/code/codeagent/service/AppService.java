@@ -2,6 +2,7 @@ package com.code.codeagent.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.code.codeagent.model.dto.app.AppAddRequest;
 import com.code.codeagent.model.dto.app.AppQueryRequest;
 import com.code.codeagent.model.entity.App;
 import com.code.codeagent.model.entity.User;
@@ -47,6 +48,20 @@ public interface AppService extends IService<App> {
      * @return 部署URL
      */
     String deployApp(Long appId, User loginUser);
+    /**
+     * 创建应用
+     * 
+     * @param appAddRequest 创建应用请求
+     * @param loginUser 登录用户
+     * @return 应用ID
+     */
+    Long addApp(AppAddRequest appAddRequest, User loginUser);
+    /**
+     * 异步生成应用截图
+     * @param appId 应用ID
+     * @param deployUrl 部署URL
+     */
+    void generateScreenshotAsync(Long appId, String deployUrl); 
 
     /**
      * 获取应用封装类

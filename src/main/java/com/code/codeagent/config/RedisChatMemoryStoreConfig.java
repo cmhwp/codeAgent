@@ -15,16 +15,16 @@ import org.springframework.context.annotation.Configuration;
 @Slf4j
 public class RedisChatMemoryStoreConfig {
 
-    @Value("${langchain4j.redis.host:localhost}")
+    @Value("${spring.data.redis.host:localhost}")
     private String host;
     
-    @Value("${langchain4j.redis.port:6379}")
+    @Value("${spring.data.redis.port:6379}")
     private int port;
     
-    @Value("${langchain4j.redis.password:}")
+    @Value("${spring.data.redis.password:}")
     private String password;
     
-    @Value("${langchain4j.redis.ttl:3600}")
+    @Value("${spring.data.redis.ttl:3600}")
     private long ttl;
 
     @Bean

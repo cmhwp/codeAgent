@@ -7,6 +7,8 @@ spring:
   profiles:
     active: local
   
+  # DevTools 已从依赖中移除，不再需要配置
+  
   # 数据源配置
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -123,15 +125,6 @@ knife4j:
     enable-swagger-models: true
     enable-document-manage: true
     swagger-model-name: 实体类列表
-
-# LangChain4j Redis 配置
-langchain4j:
-  redis:
-    host: localhost
-    port: 6379
-    password: 
-    database: 0
-    ttl: 3600  # TTL in seconds (1 hour)
 
 # 日志配置
 logging:

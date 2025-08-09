@@ -8,6 +8,8 @@ import com.code.codeagent.config.AiCodeGeneratorServiceFactory;
 import com.code.codeagent.constant.UserConstant;
 import com.code.codeagent.exception.BusinessException;
 import com.code.codeagent.exception.ErrorCode;
+
+import java.util.Map;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -37,8 +39,8 @@ public class CacheController {
     @SaCheckLogin
     @SaCheckRole(UserConstant.ADMIN_ROLE)
     @Operation(summary = "获取缓存统计", description = "获取AI服务缓存的统计信息（管理员）")
-    public BaseResponse<String> getCacheStats() {
-        String stats = aiCodeGeneratorServiceFactory.getCacheStats();
+    public BaseResponse<Map<String, Object>> getCacheStats() {
+        Map<String, Object> stats = aiCodeGeneratorServiceFactory.getCacheStats();
         return ResultUtils.success(stats);
     }
 
@@ -74,7 +76,7 @@ public class CacheController {
     @Operation(summary = "清除所有缓存", description = "清除所有AI服务缓存（管理员功能）")
     public BaseResponse<Boolean> evictAllCache() {
         try {
-            aiCodeGeneratorServiceFactory.evictAllCache();
+            aiCodeGeneratorServiceFactory.evictAllCaches();
             log.info("管理员清除了所有AI服务缓存");
             return ResultUtils.success(true);
         } catch (Exception e) {
@@ -98,7 +100,7 @@ public class CacheController {
         
         try {
             // 预热缓存，触发AI服务实例的创建
-            aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId);
+            aiCodeGeneratorServiceFactory.warmupCache(appId);
             log.info("已为 appId: {} 预热缓存", appId);
             return ResultUtils.success(true);
         } catch (Exception e) {
