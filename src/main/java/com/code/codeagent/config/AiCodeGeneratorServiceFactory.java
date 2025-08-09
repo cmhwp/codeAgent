@@ -137,7 +137,20 @@ public class AiCodeGeneratorServiceFactory {
                         .chatModel(chatModel)
                         .streamingChatModel(reasoningStreamingChatModel)
                         .chatMemoryProvider(memoryId->chatMemory)
-                        .tools(new FileWriteTool())
+                        .tools(new FileWriteTool(CodeGenTypeEnum.VUE_PROJECT))
+                        // 处理工具调用幻觉问题
+                        .hallucinatedToolNameStrategy(toolExecutionRequest ->
+                                ToolExecutionResultMessage.from(toolExecutionRequest,
+                                        "Error: there is no tool called " + toolExecutionRequest.name())        
+                        )
+                        .build();
+            }
+            case REACT_PROJECT -> {
+                return AiServices.builder(AiCodeGeneratorService.class)
+                        .chatModel(chatModel)
+                        .streamingChatModel(reasoningStreamingChatModel)
+                        .chatMemoryProvider(memoryId->chatMemory)
+                        .tools(new FileWriteTool(CodeGenTypeEnum.REACT_PROJECT))
                         // 处理工具调用幻觉问题
                         .hallucinatedToolNameStrategy(toolExecutionRequest ->
                                 ToolExecutionResultMessage.from(toolExecutionRequest,

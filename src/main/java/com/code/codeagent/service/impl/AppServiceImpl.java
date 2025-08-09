@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.code.codeagent.constant.AppConstant;
 import com.code.codeagent.core.AiCodeGeneratorFacade;
 import com.code.codeagent.core.builder.VueProjectBuilder;
+import com.code.codeagent.core.builder.ReactProjectBuilder;
 import com.code.codeagent.core.handler.StreamHandlerExecutor;
 import com.code.codeagent.ai.AiCodeGenTypeRoutingService;
 import com.code.codeagent.exception.BusinessException;
@@ -66,6 +67,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+
+    @Resource
+    private ReactProjectBuilder reactProjectBuilder;
 
     @Resource
     private ScreenshotService screenshotService;
@@ -180,15 +184,24 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         ThrowUtils.throwIf(files == null || files.length == 0, 
                           ErrorCode.SYSTEM_ERROR, "应用代码目录为空，请先生成应用");
         
-        //vue项目需要额外处理
-        CodeGenTypeEnum vueProject = CodeGenTypeEnum.getEnumByValue(codeGenType);
-        if (vueProject == CodeGenTypeEnum.VUE_PROJECT) {
+        //项目类型需要额外处理（构建和使用dist目录）
+        CodeGenTypeEnum projectType = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        if (projectType == CodeGenTypeEnum.VUE_PROJECT) {
             // 1. 构建vue项目
             Boolean buildResult = vueProjectBuilder.buildProject(sourceDirPath);
-            ThrowUtils.throwIf(!buildResult, ErrorCode.SYSTEM_ERROR, "应用构建失败，请重试！");
+            ThrowUtils.throwIf(!buildResult, ErrorCode.SYSTEM_ERROR, "Vue应用构建失败，请重试！");
             // 2. 检查构建目录是否存在
             File distDir = new File(sourceDirPath,"dist");
-            ThrowUtils.throwIf(!distDir.exists(), ErrorCode.SYSTEM_ERROR, "应用构建失败，未生成dist目录，请重试！");
+            ThrowUtils.throwIf(!distDir.exists(), ErrorCode.SYSTEM_ERROR, "Vue应用构建失败，未生成dist目录，请重试！");
+            // 3. 复制文件到部署目录
+            sourceDir = distDir;
+        } else if (projectType == CodeGenTypeEnum.REACT_PROJECT) {
+            // 1. 构建react项目
+            Boolean buildResult = reactProjectBuilder.buildProject(sourceDirPath);
+            ThrowUtils.throwIf(!buildResult, ErrorCode.SYSTEM_ERROR, "React应用构建失败，请重试！");
+            // 2. 检查构建目录是否存在
+            File distDir = new File(sourceDirPath,"dist");
+            ThrowUtils.throwIf(!distDir.exists(), ErrorCode.SYSTEM_ERROR, "React应用构建失败，未生成dist目录，请重试！");
             // 3. 复制文件到部署目录
             sourceDir = distDir;
         }

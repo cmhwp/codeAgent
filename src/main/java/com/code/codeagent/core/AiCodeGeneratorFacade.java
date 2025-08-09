@@ -115,6 +115,10 @@ public class AiCodeGeneratorFacade {
                 TokenStream tokenStream = service.generateVueProjectCodeStream(appId, userMessage);
                 yield processTokenStream(tokenStream);
             }
+            case REACT_PROJECT -> {
+                TokenStream tokenStream = service.generateReactProjectCodeStream(appId, userMessage);
+                yield processTokenStream(tokenStream);
+            }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);

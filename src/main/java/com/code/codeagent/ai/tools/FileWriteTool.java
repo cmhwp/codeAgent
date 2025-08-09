@@ -3,6 +3,7 @@ package com.code.codeagent.ai.tools;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.json.JSONObject;
 import com.code.codeagent.constant.AppConstant;
+import com.code.codeagent.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.agent.tool.P;
 import dev.langchain4j.agent.tool.Tool;
 import dev.langchain4j.agent.tool.ToolMemoryId;
@@ -23,6 +24,22 @@ import java.nio.file.StandardOpenOption;
 @Component
 public class FileWriteTool extends BaseTool {
 
+    private final CodeGenTypeEnum codeGenType;
+
+    /**
+     * 默认构造函数，用于Vue项目（向后兼容）
+     */
+    public FileWriteTool() {
+        this.codeGenType = CodeGenTypeEnum.VUE_PROJECT;
+    }
+
+    /**
+     * 带代码生成类型的构造函数
+     */
+    public FileWriteTool(CodeGenTypeEnum codeGenType) {
+        this.codeGenType = codeGenType;
+    }
+
     @Tool("写入文件到指定路径")
     public String writeFile(
             @P("文件的相对路径")
@@ -34,8 +51,8 @@ public class FileWriteTool extends BaseTool {
         try {
             Path path = Paths.get(relativeFilePath);
             if (!path.isAbsolute()) {
-                // 相对路径处理，创建基于 appId 的项目目录
-                String projectDirName = "vue_project_" + appId;
+                // 相对路径处理，创建基于 appId 和代码类型的项目目录
+                String projectDirName = codeGenType.getValue() + "_" + appId;
                 Path projectRoot = Paths.get(AppConstant.CODE_OUTPUT_ROOT_DIR, projectDirName);
                 path = projectRoot.resolve(relativeFilePath);
             }

@@ -59,4 +59,13 @@ public interface AiCodeGeneratorService {
      */
     @SystemMessage(fromResource = "prompt/codegen-vue-project-system-prompt.txt")
     TokenStream generateVueProjectCodeStream(@MemoryId long appId, @UserMessage String userMessage);
+
+    /**
+     * 流式生成 React 项目代码
+     *
+     * @param userMessage 用户消息
+     * @return 生成的代码流
+     */
+    @SystemMessage(fromResource = "prompt/codegen-react-project-system-prompt.txt")
+    TokenStream generateReactProjectCodeStream(@MemoryId long appId, @UserMessage String userMessage);
 }

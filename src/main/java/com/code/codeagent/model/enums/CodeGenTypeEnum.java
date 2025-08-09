@@ -13,7 +13,8 @@ public enum CodeGenTypeEnum {
 
     HTML("原生 HTML 模式", "html"),
     MULTI_FILE("原生多文件模式", "multi_file"),
-    VUE_PROJECT("Vue 项目模式", "vue");
+    VUE_PROJECT("Vue 项目模式", "vue"),
+    REACT_PROJECT("React 项目模式", "react");
 
     private final String text;
     private final String value;

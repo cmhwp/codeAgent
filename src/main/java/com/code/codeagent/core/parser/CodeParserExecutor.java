@@ -27,6 +27,8 @@ public class CodeParserExecutor {
         return switch (codeGenTypeEnum) {
             case HTML -> htmlCodeParser.parseCode(codeContent);
             case MULTI_FILE -> multiFileCodeParser.parseCode(codeContent);
+            case VUE_PROJECT, REACT_PROJECT -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, 
+                    "项目类型代码通过工具直接处理，不应调用此解析器: " + codeGenTypeEnum);
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
         };
     }
