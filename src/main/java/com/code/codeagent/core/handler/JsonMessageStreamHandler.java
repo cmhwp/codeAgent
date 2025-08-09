@@ -12,6 +12,8 @@ import com.code.codeagent.model.entity.User;
 import com.code.codeagent.model.enums.ChatHistoryMessageTypeEnum;
 import com.code.codeagent.service.ChatHistoryService;
 import com.code.codeagent.core.builder.VueProjectBuilder;
+import com.code.codeagent.core.builder.ReactProjectBuilder;
+import com.code.codeagent.model.enums.CodeGenTypeEnum;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -22,7 +24,7 @@ import java.util.Set;
 
 /**
  * JSON 消息流处理器
- * 处理 VUE_PROJECT 类型的复杂流式响应，包含工具调用信息
+ * 处理 VUE_PROJECT 和 REACT_PROJECT 类型的复杂流式响应，包含工具调用信息
  */
 @Slf4j
 @Component
@@ -30,24 +32,28 @@ public class JsonMessageStreamHandler {
 
     @Resource
     private VueProjectBuilder vueProjectBuilder;
+    
+    @Resource
+    private ReactProjectBuilder reactProjectBuilder;
 
     @Resource
     private ToolManager toolManager;
 
     /**
-     * 处理 TokenStream（VUE_PROJECT）
+     * 处理 TokenStream（VUE_PROJECT、REACT_PROJECT）
      * 解析 JSON 消息并重组为完整的响应格式
      *
      * @param originFlux         原始流
      * @param chatHistoryService 聊天历史服务
      * @param appId              应用ID
      * @param loginUser          登录用户
+     * @param codeGenType        代码生成类型
      * @param parentMessageId    父消息ID（用户消息ID）
      * @return 处理后的流
      */
     public Flux<String> handle(Flux<String> originFlux,
                                ChatHistoryService chatHistoryService,
-                               long appId, User loginUser, Long parentMessageId) {
+                               long appId, User loginUser, CodeGenTypeEnum codeGenType, Long parentMessageId) {
         // 收集数据用于生成后端记忆格式
         StringBuilder chatHistoryStringBuilder = new StringBuilder();
         // 用于跟踪已经见过的工具ID，判断是否是第一次调用
@@ -62,9 +68,13 @@ public class JsonMessageStreamHandler {
                     // 流式响应完成后，添加 AI 消息到对话历史
                     String aiResponse = chatHistoryStringBuilder.toString();
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId(), parentMessageId);
-                    // 异步构造 Vue 项目
-                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-                    vueProjectBuilder.buildProjectAsync(projectPath);
+                    // 根据项目类型异步构造项目
+                    String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/" + codeGenType.getValue() + "_" + appId;
+                    if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+                        vueProjectBuilder.buildProjectAsync(projectPath);
+                    } else if (codeGenType == CodeGenTypeEnum.REACT_PROJECT) {
+                        reactProjectBuilder.buildProjectAsync(projectPath);
+                    }
                 })
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
